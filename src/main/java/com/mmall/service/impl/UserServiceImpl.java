@@ -11,6 +11,7 @@ import org.apache.commons.lang3.StringUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
+import javax.servlet.http.HttpSession;
 import java.util.UUID;
 
 @Service
@@ -94,7 +95,7 @@ public class UserServiceImpl implements IUserService {
         int resultCount = userMapper.checkAnswer(username, question, answer);
         if (resultCount > 0){
             String forgetToken = UUID.randomUUID().toString();
-            TokenCache.setKey("token_"+username, forgetToken);
+            TokenCache.setKey(TokenCache.TOKEN_PREFIX+username, forgetToken);
             return ServerResponse.createBySuccessMessage(forgetToken);
         }
         return ServerResponse.createByErrorMessage("问题的答案是错误的");
@@ -102,9 +103,44 @@ public class UserServiceImpl implements IUserService {
 
     @Override
     public ServerResponse<String> forgetRestPassword(String username, String passwordNew, String forgetToken) {
+        if (StringUtils.isBlank(forgetToken)){
+            return ServerResponse.createByErrorMessage("参数错误，token需要传递");
+        }
 
-        return null;
+        ServerResponse<String> response = this.checkValid(username, Const.CURRENT_USER);
+        if(response.isSuccess()){
+            //用户不存在
+            return ServerResponse.createByErrorMessage("用户不存在");
+        }
+
+        String token = TokenCache.getKey(TokenCache.TOKEN_PREFIX + username);
+        if (StringUtils.isBlank(token)){
+            return ServerResponse.createByErrorMessage("token无效或过期");
+        }
+
+        if (StringUtils.equals(forgetToken, token)){
+            String md5password = MD5Util.MD5EncodeUtf8(passwordNew);
+            int count = userMapper.updatePasswordByUsername(username, md5password);
+            if (count>0){
+                return ServerResponse.createBySuccessMessage("修改密码成功");
+            }
+        } else {
+            return ServerResponse.createByErrorMessage("token错误，请重新获取重置密码的token");
+        }
+        return ServerResponse.createByErrorMessage("修改密码失败");
     }
 
-
+    @Override
+    public ServerResponse<String> resetPassword(User user, String passwordOld, String passwordNew) {
+        int count = userMapper.checkPassword(MD5Util.MD5EncodeUtf8(passwordOld), user.getId());
+        if (count == 0){
+            return ServerResponse.createByErrorMessage("旧密码错误");
+        }
+        user.setPassword(MD5Util.MD5EncodeUtf8(passwordNew));
+        int updateCount = userMapper.updateByPrimaryKeySelective(user);
+        if (updateCount > 0){
+            return ServerResponse.createBySuccessMessage("密码更新成功");
+        }
+        return ServerResponse.createByErrorMessage("密码更新错误");
+    }
 }

@@ -3,6 +3,8 @@ package com.mmall.service;
 import com.mmall.common.ServerResponse;
 import com.mmall.pojo.User;
 
+import javax.servlet.http.HttpSession;
+
 public interface IUserService {
 
     ServerResponse<User> login(String username, String password);
@@ -16,4 +18,6 @@ public interface IUserService {
     ServerResponse<String> checkAnswer(String username, String question, String answer);
 
     ServerResponse<String> forgetRestPassword(String username, String passwordNew, String forgetToken);
+
+    ServerResponse<String> resetPassword(User user, String passwordOld, String passwordNew);
 }
